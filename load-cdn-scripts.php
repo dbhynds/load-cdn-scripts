@@ -19,7 +19,7 @@ class load_cdn_scripts {
 	static $cdn_scripts;
 	
 	static function init() {
-		self::$cdn_scripts = self::get_cdn();
+		if (is_admin()) self::$cdn_scripts = self::get_cdn();
 		add_action('admin_menu', array(__CLASS__,'submenu_page'));
 		add_action( 'admin_init', array(__CLASS__,'register_settings') );
 	}
@@ -32,36 +32,10 @@ class load_cdn_scripts {
 		register_setting(self::$ID,'cdn_scripts');
 		register_setting(self::$ID,'registered_scripts');
 	}
-	public function validate($input) {
-		/*$valid = array();
-		$valid['url_todo'] = sanitize_text_field($input['url_todo']);
-		$valid['title_todo'] = sanitize_text_field($input['title_todo']);
-		if (strlen($valid['url_todo']) == 0) {
-			add_settings_error(
-					'todo_url',                     // Setting title
-					'todourl_texterror',            // Error ID
-					'Please enter a valid URL',     // Error message
-					'error'                         // Type of message
-			);
-			// Set it to the default value
-			$valid['url_todo'] = $this->data['url_todo'];
-		}
-		if (strlen($valid['title_todo']) == 0) {
-			add_settings_error(
-					'todo_title',
-					'todotitle_texterror',
-					'Please enter a title',
-					'error'
-			);
-			$valid['title_todo'] = $this->data['title_todo'];
-		}
-		return $valid;*/
-	}
-	
 	
 	static function update_options() {
-		if (isset($_POST["update_settings"])) {
-			var_dump($_POST);
+		if (isset($_POST["_wp_http_referer"]) && $_POST["_wp_http_referer"] == $_SERVER[REQUEST_URI]) {
+			update_option('registered_scripts',$_POST);
 		}
 	}
 	
@@ -74,8 +48,8 @@ class load_cdn_scripts {
 		<div class="wrap">
 			<h2>Registered</h2>
             <style>
-				.diffver {
-					background: #ffa;
+				.samever {
+					background: #afa;
 				}
 				.nocdn {
 					background: #fcc;
@@ -90,10 +64,7 @@ class load_cdn_scripts {
 				}
 			</style>
             <form method="post" action="">
-            	<?php 
-					$pluginoptions = get_option('registered_scripts');
-				?>
-                <input type="text" value="<?php var_dump($pluginoptions); ?>" name="registered_scripts" />
+            	<?php $pluginoptions = get_option('registered_scripts'); ?>
                 
                 <table class="widefat" id="registered-scripts">
                 <thead>
@@ -121,16 +92,14 @@ class load_cdn_scripts {
 					$scripts = $wp_scripts->registered[$val];
 					preg_match('/\d+(\.\d+)+/', self::$cdn_scripts[$scripts->handle], $matches);
 					$css = null;
-					if (strpos($scripts->ver,$matches[0]) === 0 || strpos($matches[0],$scripts->ver) === 0) $css = 'diffver';
+					if (strpos($scripts->ver,$matches[0]) === 0 || strpos($matches[0],$scripts->ver) === 0) $css = 'samever';
                     if (!array_key_exists($val,self::$cdn_scripts)) $css = 'nocdn';
                     if (preg_match('/^\/\//',$scripts->src)) $css = 'iscdn';
-                    echo self::list_scripts($scripts, $css);
+                    echo self::list_scripts($pluginoptions, $scripts, $css);
                 }
                 ?>
                 </tbody>
                 </table>
-                
-                <input type="hidden" name="update_settings" value="Y" />
                 <p class="submit">
                     <input type="submit" class="button-primary" value="<?php _e('Save Changes') ?>" />
                 </p>
@@ -139,7 +108,7 @@ class load_cdn_scripts {
 		<?php
 	}
 	
-	static function list_scripts($scripts = array(),$class = null) {	
+	static function list_scripts($pluginoptions = false, $scripts = array(),$class = null) {	
 		$return = '';
 		$return .= "<tr class='row $class'>";
 		$return .= '<td>'.$scripts->handle.'</td>';
@@ -147,15 +116,18 @@ class load_cdn_scripts {
 		preg_match('/\d+(\.\d+)+/', self::$cdn_scripts[$scripts->handle], $matches);
 		$return .= '<td>'.$matches[0].'</td>';
 		$return .= '<td>';
-			/*$return .= '<table>';
-			$return .= '<tr><td><input type="radio" /><label>default src:</label></td><td>'.$scripts->src.'</td></tr>';
-			$return .= '<tr><td><input type="radio" /><label>cdn src:</label></td><td>'.self::$cdn_scripts[$scripts->handle].'</td></tr>';
-			$return .= '<tr><td><input type="radio" /><label>custom src:</label></td><td><input /></td></tr>';
-			$return .= '</table>';*/
-			
-			$return .= '<label><input type="radio" name="'.$scripts->handle.'" value="native" />default src: '.$scripts->src.'</label><br />';
-			$return .= '<label><input type="radio" name="'.$scripts->handle.'" value="cdn" />cdn src: '.self::$cdn_scripts[$scripts->handle].'</label><br />';
-			$return .= '<label><input type="radio" name="'.$scripts->handle.'" value="custom" />custom src:</label><input name="custom"/>';
+		
+			if ($pluginoptions == false) {
+				if ($class == 'samever') $pluginoptions[$scripts->handle] = 'cdn';
+				else $pluginoptions[$scripts->handle] = 'native';
+			}
+		
+			$checked = ($pluginoptions[$scripts->handle] == 'native') ? 'checked' : '';
+			$return .= '<label><input type="radio" '.$checked.' name="'.$scripts->handle.'" value="native" />default src: '.$scripts->src.'</label><br />';
+			$checked = ($pluginoptions[$scripts->handle] == 'cdn') ? 'checked' : '';
+			$return .= '<label><input type="radio" '.$checked.' name="'.$scripts->handle.'" value="cdn" />cdn src: '.self::$cdn_scripts[$scripts->handle].'</label><br />';
+			$checked = ($pluginoptions[$scripts->handle] == 'custom') ? 'checked' : '';
+			$return .= '<label><input type="radio" '.$checked.' name="'.$scripts->handle.'" value="custom" />custom src:</label> <input name="'.$scripts->handle.'_custom" value="'.$pluginoptions[$scripts->handle.'_custom'].'" />';
 			
 		$return .= '</td>';
 		$return .= '<td class="">';
