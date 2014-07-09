@@ -10,6 +10,7 @@ Version: 0.6.1
 Text Domain: wordpress-importer
 License: GPL version 2 or later - http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 */
+
 defined('ABSPATH') or die("No script kiddies please!");
 
 class load_cdn_scripts {
@@ -38,25 +39,36 @@ class load_cdn_scripts {
 		add_option('cdn_scripts',self::$cdn_scripts);
 		// save an empty set of registered scripts
 		add_option('registered_scripts',array());
+		// save an empty set of override scripts
+		add_option('override_scripts',array());
 	}
 	
 	static function update_options() {
 		// submitted by self?
 		if (isset($_POST["_wp_http_referer"]) && $_POST["_wp_http_referer"] == $_SERVER[REQUEST_URI]) {
 			// these will be our options
-			$options = array();
-			/* fill options from $_POST as
+			$registered_scripts = array();
+			$override_scripts = array();
+			/* fill $registered_scripts from $_POST as
 				[handle] => array (
 					'src' => $opt_val,
 					'custom' => $custom_val
 				)
 			*/
+			/* fill $override_scripts as [handle] => new_src
+			*/
 			foreach ( $_POST as $key => $val ) {
-				if (substr($key,0,4) == 'opt_') $options[$key] = array ( 'src' => $val, 'custom' => $_POST[$key.'_custom']);
+				if (substr($key,0,4) == 'opt_') {
+					$handle = substr($key,4);
+					$registered_scripts[$handle] = array ( 'src' => $val, 'custom' => $_POST[$key.'_custom']);
+					if ($val == 'cdn') $override_scripts[$handle] = self::$cdn_scripts[$handle];
+					if ($val == 'custom') $override_scripts[$handle] = $_POST[$key.'_custom'];
+				}
 			}
-			var_dump($options);
-			// update option in db
-			update_option('registered_scripts',$options);
+			var_dump($override_scripts);
+			// update options in db
+			update_option('registered_scripts',$registered_scripts);
+			update_option('override_scripts',$override_scripts);
 		}
 	}
 	
@@ -82,6 +94,9 @@ class load_cdn_scripts {
 					padding: 0;
 					padding-right: .5em;
 					line-height: 2em;
+				}
+				#registered-scripts input[type="text"] {
+					width: 80%;
 				}
 			</style>
             <form method="post" action="">                
@@ -114,6 +129,8 @@ class load_cdn_scripts {
                         endif;
                     endif;
                 }
+				
+				sort($registeredscripts);
 				
 				// now that we have our CDN-able registered scripts, loop and list 'em in the table
                 foreach($registeredscripts as $val) {
@@ -157,24 +174,26 @@ class load_cdn_scripts {
 		$return .= '<td>';
 		
 			// set default values if this script doesn't have an associated option.
-			if (!array_key_exists('opt_'.$scripts->handle,$pluginoptions)) {
+			if (!array_key_exists($scripts->handle,$pluginoptions)) {
 				// set to cdn if it's likely a cdn
-				if ($class == 'samever') $pluginoptions['opt_'.$scripts->handle]['src'] = 'cdn';
+				if ($class == 'samever') $pluginoptions[$scripts->handle]['src'] = 'cdn';
 				// otherwise default to registered src
 				else $pluginoptions[$scripts->handle]['src'] = 'native';
 			}
 		
 			// if it should default to the registered src, check that and echo option
-			$checked = ($pluginoptions['opt_'.$scripts->handle]['src'] == 'native') ? 'checked' : '';
+			$checked = ($pluginoptions[$scripts->handle]['src'] == 'native') ? 'checked' : '';
 			$return .= '<label><input type="radio" '.$checked.' name="opt_'.$scripts->handle.'" value="native" />default src: '.$scripts->src.'</label><br />';
 			
 			// if it should default to the cdn src, check that and echo option
-			$checked = ($pluginoptions['opt_'.$scripts->handle]['src'] == 'cdn') ? 'checked' : '';
+			$checked = ($pluginoptions[$scripts->handle]['src'] == 'cdn') ? 'checked' : '';
 			$return .= '<label><input type="radio" '.$checked.' name="opt_'.$scripts->handle.'" value="cdn" />cdn src: '.self::$cdn_scripts[$scripts->handle].'</label><br />';
 			
 			// if it should default to the custom src, check that and echo option
-			$checked = ($pluginoptions['opt_'.$scripts->handle]['src'] == 'custom') ? 'checked' : '';
-			$return .= '<label><input type="radio" '.$checked.' name="opt_'.$scripts->handle.'" value="custom" />custom src:</label> <input name="'.$scripts->handle.'_custom" value="'.$pluginoptions[$scripts->handle]['custom'].'" />';
+			$checked = ($pluginoptions[$scripts->handle]['src'] == 'custom') ? 'checked' : '';
+			// if no specified custom src, default to cdn src
+			$customsrc = ( strlen($pluginoptions[$scripts->handle]['custom']) != 0) ? $pluginoptions[$scripts->handle]['custom'] : self::$cdn_scripts[$scripts->handle];
+			$return .= '<label><input type="radio" '.$checked.' name="opt_'.$scripts->handle.'" value="custom" /> <input type="text" name="'.$scripts->handle.'_custom" value="'.$customsrc.'" /></label>';
 			
 		$return .= '</td>';
 		// echo any deps
