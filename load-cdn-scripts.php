@@ -100,22 +100,18 @@ class load_cdn_scripts {
 					background: #acf;
 				}
 				#registered-scripts table td {
-					padding: 0;
-					padding-right: .5em;
-					line-height: 2em;
 				}
 				#registered-scripts input[type="text"] {
-					width: 80%;
+					width: 100%;
 				}
 			</style>
             <form method="post" action="">                
                 <table class="widefat" id="registered-scripts">
                 <thead>
-                    <th>handle</th>
-                    <th>default version</th>
-                    <th>cdn version</th>
-                    <th>src</th>
-                    <th>deps</th>
+                    <th>Handle</th>
+                    <th>Default</th>
+                    <th>CDN</th>
+                    <th>Dependencies</th>
                 </thead>
                 <tbody>
                 <?php
@@ -123,7 +119,7 @@ class load_cdn_scripts {
 				
 				// get saved options
 				$pluginoptions = get_option('registered_scripts');
-				
+				var_dump($pluginoptions);
 				// make list of registered scripts
                 $registeredscripts = array();
                 foreach($wp_scripts->registered as $key => $val) {
@@ -145,18 +141,20 @@ class load_cdn_scripts {
                 foreach($registeredscripts as $val) {
 					// get the script's info from the list of registered scripts
 					$scripts = $wp_scripts->registered[$val];
-					// search for a likely version number in the [src] of the matching CDN script
-					preg_match('/\d+(\.\d+)+/', self::$cdn_scripts[$scripts->handle], $matches);
-					// no css class yet
-					$css = null;
-					// if the registered version matches the probably CDN version, note this and flag it for possible CDN-ifying
-					if (strpos($scripts->ver,$matches[0]) === 0 || strpos($matches[0],$scripts->ver) === 0) $css = 'samever';
-					// if there isn't a CDN match, flag for warning
-                    if (!array_key_exists($val,self::$cdn_scripts)) $css = 'nocdn';
-					// if it probably already is a CDN, flag it for likely cdn-ifying
-                    if (preg_match('/^\/\//',$scripts->src)) $css = 'iscdn';
-					//echo the options
-                    echo self::list_scripts($pluginoptions, $scripts, $css);
+					if ($scripts->src) {
+						// search for a likely version number in the [src] of the matching CDN script
+						preg_match('/\d+(\.\d+)+/', self::$cdn_scripts[$scripts->handle], $matches);
+						// no css class yet
+						$css = null;
+						// if the registered version matches the probably CDN version, note this and flag it for possible CDN-ifying
+						if (strpos($scripts->ver,$matches[0]) === 0 || strpos($matches[0],$scripts->ver) === 0) $css = 'samever';
+						// if there isn't a CDN match, flag for warning
+						if (!array_key_exists($val,self::$cdn_scripts)) $css = 'nocdn';
+						// if it probably already is a CDN, flag it for likely cdn-ifying
+						if (preg_match('/^\/\//',$scripts->src)) $css = 'iscdn';
+						//echo the options
+						echo self::list_scripts($pluginoptions, $scripts, $css);
+					}
                 }
                 ?>
                 </tbody>
@@ -170,39 +168,34 @@ class load_cdn_scripts {
 	}
 	
 	static function list_scripts($pluginoptions = false, $scripts = array(),$class = null) {
-		// start fresh	
+		// set the handle
+		$handle = $scripts->handle;
+		
+		// start fresh
 		$return = '';
 		$return .= "<tr class='row $class'>";
 		// echo handle
-		$return .= '<td>'.$scripts->handle.'</td>';
-		// echo version
-		$return .= '<td>'.$scripts->ver.'</td>';
-		// echo any likely CDN version
-		preg_match('/\d+(\.\d+)+/', self::$cdn_scripts[$scripts->handle], $matches);
-		$return .= '<td>'.$matches[0].'</td>';
+		$return .= '<td>'.$handle.'</td>';
+		// echo default script info as registered with wordpress
 		$return .= '<td>';
-		
-			// set default values if this script doesn't have an associated option.
-			if (!array_key_exists($scripts->handle,$pluginoptions)) {
-				// set to cdn if it's likely a cdn
-				if ($class == 'samever') $pluginoptions[$scripts->handle]['src'] = 'cdn';
-				// otherwise default to registered src
-				else $pluginoptions[$scripts->handle]['src'] = 'native';
-			}
-		
-			// if it should default to the registered src, check that and echo option
-			$checked = ($pluginoptions[$scripts->handle]['src'] == 'native') ? 'checked' : '';
-			$return .= '<label><input type="radio" '.$checked.' name="opt_'.$scripts->handle.'" value="native" />default src: '.$scripts->src.'</label><br />';
-			
-			// if it should default to the cdn src, check that and echo option
-			$checked = ($pluginoptions[$scripts->handle]['src'] == 'cdn') ? 'checked' : '';
-			$return .= '<label><input type="radio" '.$checked.' name="opt_'.$scripts->handle.'" value="cdn" />cdn src: '.self::$cdn_scripts[$scripts->handle].'</label><br />';
-			
+			// echo default src
+			$return .= '<input type="text" disabled="disabled" value="'.$scripts->src.'" />';
+			// echo version
+			$return .= 'Version: '.$scripts->ver.'<br />';
 			// if it should default to the custom src, check that and echo option
-			$checked = ($pluginoptions[$scripts->handle]['src'] == 'custom') ? 'checked' : '';
-			// if no specified custom src, default to cdn src
-			$customsrc = ( strlen($pluginoptions[$scripts->handle]['custom']) != 0) ? $pluginoptions[$scripts->handle]['custom'] : self::$cdn_scripts[$scripts->handle];
-			$return .= '<label><input type="radio" '.$checked.' name="opt_'.$scripts->handle.'" value="custom" /> <input type="text" name="'.$scripts->handle.'_custom" value="'.$customsrc.'" /></label>';
+			$checked = ($pluginoptions[$handle]['src'] == 'native') ? 'checked' : '';
+			$return .= '<label><input type="checkbox" '.$checked.' name="opt_'.$handle.'" value="native" />Use default source</label></p>';
+		
+		$return .= '</td><td>';
+		
+			// WP calls jquery by the handle jquery-core
+			if ($handle == 'jquery-core') $handle = 'jquery';
+			// if it should default to the registered src, check that and echo option
+			$return .= '<input type="text" name="'.$handle.'_src" value="'.self::$cdn_scripts[$handle].'" />';
+			
+			// echo any likely CDN version
+			preg_match('/\d+(\.\d+)+/', self::$cdn_scripts[$handle], $matches);
+			$return .= 'Version: '.$matches[0].'';
 			
 		$return .= '</td>';
 		// echo any deps
