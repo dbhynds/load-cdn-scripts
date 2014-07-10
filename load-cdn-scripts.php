@@ -64,17 +64,17 @@ class load_cdn_scripts {
 			*/
 			/* fill $override_scripts as [handle] => new_src
 			*/
-			var_dump($_POST);
+			//var_dump($_POST);
 			echo "<br /><br />";
 			foreach ( $_POST as $key => $val ) {
 				if (substr($key,0,4) == 'opt_') {
 					$handle = substr($key,4);
-					$registered_scripts[$handle] = array ( 'src' => $val, 'custom' => $_POST[$key.'_custom']);
-					if ($val == 'cdn') $override_scripts[$handle] = self::$cdn_scripts[$handle];
-					if ($val == 'custom') $override_scripts[$handle] = $_POST[$handle.'_custom'];
+					$cdn_url = ($handle == 'jquery-core') ? $_POST['src_jquery-core'] : $_POST['src_'.$handle];
+					$registered_scripts[$handle] = array ( 'src' => $val, 'cdn_url' => $cdn_url);
+					if ($val == 'cdn') $override_scripts[$handle] = $_POST['src_'.$handle];
 				}
 			}
-			var_dump($override_scripts);
+			//var_dump($override_scripts);
 			// update options in db
 			update_option('registered_scripts',$registered_scripts);
 			update_option('override_scripts',$override_scripts);
@@ -109,6 +109,7 @@ class load_cdn_scripts {
                 <table class="widefat" id="registered-scripts">
                 <thead>
                     <th>Handle</th>
+                    <th>Load from</th>
                     <th>Default</th>
                     <th>CDN</th>
                     <th>Dependencies</th>
@@ -119,7 +120,7 @@ class load_cdn_scripts {
 				
 				// get saved options
 				$pluginoptions = get_option('registered_scripts');
-				var_dump($pluginoptions);
+				//var_dump($pluginoptions);
 				// make list of registered scripts
                 $registeredscripts = array();
                 foreach($wp_scripts->registered as $key => $val) {
@@ -149,8 +150,6 @@ class load_cdn_scripts {
 						// if the registered version matches the probably CDN version, note this and flag it for possible CDN-ifying
 						if (strpos($scripts->ver,$matches[0]) === 0 || strpos($matches[0],$scripts->ver) === 0) $css = 'samever';
 						// if there isn't a CDN match, flag for warning
-						if (!array_key_exists($val,self::$cdn_scripts)) $css = 'nocdn';
-						// if it probably already is a CDN, flag it for likely cdn-ifying
 						if (preg_match('/^\/\//',$scripts->src)) $css = 'iscdn';
 						//echo the options
 						echo self::list_scripts($pluginoptions, $scripts, $css);
@@ -170,32 +169,55 @@ class load_cdn_scripts {
 	static function list_scripts($pluginoptions = false, $scripts = array(),$class = null) {
 		// set the handle
 		$handle = $scripts->handle;
+		// empty vars for options
+		$opt = 'native';
+		$src;
+		if ($pluginoptions) {
+			$opt = $pluginoptions[$handle]['src'];
+			$src = $pluginoptions[$handle]['cdn_url'];
+		} else {
+			if ($class == 'samever') $opt = 'cdn';
+			$src = ($handle == 'jquery-core') ? self::$cdn_scripts['jquery'] : self::$cdn_scripts[$handle];
+		}
 		
 		// start fresh
 		$return = '';
 		$return .= "<tr class='row $class'>";
 		// echo handle
-		$return .= '<td>'.$handle.'</td>';
+		$return .= '<td><p>'.$handle.'</p></td>';
+		
+		
+		// echo src option
+		$return .= '<td>';
+			$checked = '';
+			$return .= '<label><input type="radio" '.(($opt == 'native') ? 'checked' : '').' name="opt_'.$handle.'" value="native" />Default</label> &nbsp; ';
+			$return .= '<label><input type="radio" '.(($opt == 'cdn') ? 'checked' : '').' name="opt_'.$handle.'" value="cdn" />CDN</label></p>';
+		$return .= '</td>';
+		
 		// echo default script info as registered with wordpress
 		$return .= '<td>';
 			// echo default src
 			$return .= '<input type="text" disabled="disabled" value="'.$scripts->src.'" />';
 			// echo version
-			$return .= 'Version: '.$scripts->ver.'<br />';
+			$return .= '<small>Version: '.$scripts->ver.'</small></p>';
 			// if it should default to the custom src, check that and echo option
-			$checked = ($pluginoptions[$handle]['src'] == 'native') ? 'checked' : '';
-			$return .= '<label><input type="checkbox" '.$checked.' name="opt_'.$handle.'" value="native" />Use default source</label></p>';
 		
 		$return .= '</td><td>';
 		
 			// WP calls jquery by the handle jquery-core
-			if ($handle == 'jquery-core') $handle = 'jquery';
 			// if it should default to the registered src, check that and echo option
-			$return .= '<input type="text" name="'.$handle.'_src" value="'.self::$cdn_scripts[$handle].'" />';
+			$return .= '<input type="text" name="src_'.$handle.'" value="'.$src.'" />';
 			
-			// echo any likely CDN version
-			preg_match('/\d+(\.\d+)+/', self::$cdn_scripts[$handle], $matches);
-			$return .= 'Version: '.$matches[0].'';
+			// echo likely CDN version currently in use
+			preg_match('/\d+(\.\d+)+/', $src, $matches);
+			if (!$matches[0]) $matches[0] = 'unknown';
+			$return .= '<small>Version: '.$matches[0].'</small>';
+			
+			// echo likely latest CDN version
+			$temphandle = ($handle == 'jquery-core') ? 'jquery' : $handle;
+			preg_match('/\d+(\.\d+)+/', self::$cdn_scripts[$temphandle], $latest_matches);
+			//$return .= ' '.$matches[0].' '.$latest_matches[0];
+			if ($latest_matches[0] !== $matches[0] && $matches[0] !=='unknown') $return .= ' - <small>Latest CDN Version: '.$latest_matches[0].'</small>';
 			
 		$return .= '</td>';
 		// echo any deps
