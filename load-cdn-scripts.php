@@ -23,7 +23,6 @@ class load_cdn_scripts {
 	
 	// added to "init" action
 	static function init() {
-		add_action('get_header',array(__CLASS__,'override_scripts'));
 		if (is_admin()) {
 			// Load up $cdn_scripts with list from cdnjs
 			self::$cdn_scripts = self::get_cdn();
@@ -31,6 +30,11 @@ class load_cdn_scripts {
 			add_action('admin_menu', array(__CLASS__,'submenu_page'));
 			// add settings to db
 			add_action( 'admin_init', array(__CLASS__,'register_settings') );
+		} else {
+			// override the scripts
+			add_action('get_header',array(__CLASS__,'override_scripts'));
+			// Verify that the scripts got overridden
+			//add_action('wp_head',array(__CLASS__,'check_override'));
 		}
 	}
 	static function submenu_page(){
@@ -60,12 +64,14 @@ class load_cdn_scripts {
 			*/
 			/* fill $override_scripts as [handle] => new_src
 			*/
+			var_dump($_POST);
+			echo "<br /><br />";
 			foreach ( $_POST as $key => $val ) {
 				if (substr($key,0,4) == 'opt_') {
 					$handle = substr($key,4);
 					$registered_scripts[$handle] = array ( 'src' => $val, 'custom' => $_POST[$key.'_custom']);
 					if ($val == 'cdn') $override_scripts[$handle] = self::$cdn_scripts[$handle];
-					if ($val == 'custom') $override_scripts[$handle] = $_POST[$key.'_custom'];
+					if ($val == 'custom') $override_scripts[$handle] = $_POST[$handle.'_custom'];
 				}
 			}
 			var_dump($override_scripts);
@@ -211,7 +217,16 @@ class load_cdn_scripts {
 	
 	static function override_scripts() {
 		global $wp_scripts;
-		
+		//var_dump($wp_scripts);
+		$override_scripts = get_option('override_scripts');
+		foreach ($override_scripts as $handle => $script) {
+			if(array_key_exists($handle,$wp_scripts->registered)) $wp_scripts->registered[$handle]->src = $script;
+		}
+	}
+	
+	static function check_override() {
+		global $wp_scripts;
+		var_dump($wp_scripts);
 	}
 	
 	static function overwrite_srcs() {
