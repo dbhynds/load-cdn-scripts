@@ -23,12 +23,15 @@ class load_cdn_scripts {
 	
 	// added to "init" action
 	static function init() {
-		// Load up $cdn_scripts with list from cdnjs
-		if (is_admin()) self::$cdn_scripts = self::get_cdn();
-		// add submenu item for plugin options page
-		add_action('admin_menu', array(__CLASS__,'submenu_page'));
-		// add settings to db
-		add_action( 'admin_init', array(__CLASS__,'register_settings') );
+		add_action('get_header',array(__CLASS__,'override_scripts'));
+		if (is_admin()) {
+			// Load up $cdn_scripts with list from cdnjs
+			self::$cdn_scripts = self::get_cdn();
+			// add submenu item for plugin options page
+			add_action('admin_menu', array(__CLASS__,'submenu_page'));
+			// add settings to db
+			add_action( 'admin_init', array(__CLASS__,'register_settings') );
+		}
 	}
 	static function submenu_page(){
 		// add submenu item for options page
@@ -205,7 +208,12 @@ class load_cdn_scripts {
 		// send it back to be echoed
 		return $return;
 	}
+	
+	static function override_scripts() {
+		global $wp_scripts;
 		
+	}
+	
 	static function overwrite_srcs() {
 		global $wp_scripts;
 		foreach($wp_scripts->registered as $key => $val) {
@@ -243,6 +251,55 @@ class load_cdn_scripts {
 			$val = substr($haystack,$keyPos,strpos($haystack,'</p>',$keyPos)-$keyPos);
 			// add [handle] => src to array
 			$cdn_scripts[$key] = $val;
+		}
+		
+		// handles and srcs for Google Ajax Libs
+		$ajaxlibs = array(
+			'angularjs' => array(
+				'src' => '//ajax.googleapis.com/ajax/libs/angularjs/1.2.19/angular.min.js',
+				'versions' => array('1.2.19', '1.2.18', '1.2.17', '1.2.16', '1.2.15', '1.2.14', '1.2.13', '1.2.12', '1.2.11', '1.2.10', '1.2.9', '1.2.8', '1.2.7', '1.2.6', '1.2.5', '1.2.4', '1.2.3', '1.2.2', '1.2.1', '1.2.0', '1.0.8', '1.0.7', '1.0.6', '1.0.5', '1.0.4', '1.0.3', '1.0.2', '1.0.1'),
+			),
+			'dojo' => array(
+				'src' => '//ajax.googleapis.com/ajax/libs/dojo/1.10.0/dojo/dojo.js',
+				'versions' => array('1.10.0', '1.9.3', '1.9.2', '1.9.1', '1.9.0', '1.8.6', '1.8.5', '1.8.4', '1.8.3', '1.8.2', '1.8.1', '1.8.0', '1.7.5', '1.7.4', '1.7.3', '1.7.2', '1.7.1', '1.7.0', '1.6.2', '1.6.1', '1.6.0', '1.5.3', '1.5.2', '1.5.1', '1.5.0', '1.4.5', '1.4.4', '1.4.3', '1.4.1', '1.4.0', '1.3.2', '1.3.1', '1.3.0', '1.2.3', '1.2.0', '1.1.1'),
+			),
+			'ext-core' => array(
+				'src' => '//ajax.googleapis.com/ajax/libs/ext-core/3.1.0/ext-core.js',
+				'versions' => array('3.1.0', '3.0.0'),
+			),
+			'jquery' => array(
+				'src' => '//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js',
+				'versions' => array('2.1.1', '2.1.0', '2.0.3', '2.0.2', '2.0.1', '2.0.0', '1.11.1', '1.11.0', '1.10.2', '1.10.1', '1.10.0', '1.9.1', '1.9.0', '1.8.3', '1.8.2', '1.8.1', '1.8.0', '1.7.2', '1.7.1', '1.7.0', '1.6.4', '1.6.3', '1.6.2', '1.6.1', '1.6.0', '1.5.2', '1.5.1', '1.5.0', '1.4.4', '1.4.3', '1.4.2', '1.4.1', '1.4.0', '1.3.2', '1.3.1', '1.3.0', '1.2.6', '1.2.3'),
+			),
+			'jquery-mobile' => array(
+				'src' => '//ajax.googleapis.com/ajax/libs/jquerymobile/1.4.3/jquery.mobile.min.js',
+				'style' => '//ajax.googleapis.com/ajax/libs/jquerymobile/1.4.3/jquery.mobile.min.css',
+				'versions' => array('1.4.3', '1.4.2', '1.4.1', '1.4.0'),
+			),
+			'mootools' => array(
+				'src' => '//ajax.googleapis.com/ajax/libs/mootools/1.5.0/mootools-yui-compressed.js',
+				'versions' => array('1.5.0', '1.4.5', '1.4.4', '1.4.3', '1.4.2', '1.4.1', '1.4.0', '1.3.2', '1.3.1', '1.3.0', '1.2.5', '1.2.4', '1.2.3', '1.2.2', '1.2.1', '1.1.2', '1.1.1'),
+			),
+			'prototype' => array(
+				'src' => '//ajax.googleapis.com/ajax/libs/prototype/1.7.2.0/prototype.js',
+				'versions' => array('1.7.2.0', '1.7.1.0', '1.7.0.0', '1.6.1.0', '1.6.0.3', '1.6.0.2'),
+			),
+			'scriptaculous' => array(
+				'src' => '//ajax.googleapis.com/ajax/libs/scriptaculous/1.9.0/scriptaculous.js',
+				'versions' => array('1.9.0', '1.8.3', '1.8.2', '1.8.1'),
+			),
+			'swfobject' => array(
+				'src' => '//ajax.googleapis.com/ajax/libs/swfobject/2.2/swfobject.js',
+				'versions' => array('2.2', '2.1'),
+			),
+			'webfont' => array(
+				'src' => '//ajax.googleapis.com/ajax/libs/webfont/1.5.3/webfont.js',
+				'versions' => array('1.5.3', '1.5.2', '1.5.0', '1.4.10', '1.4.8', '1.4.7', '1.4.6', '1.4.2', '1.3.0', '1.1.2', '1.1.1', '1.1.0', '1.0.31', '1.0.30', '1.0.29', '1.0.28', '1.0.27', '1.0.26', '1.0.25', '1.0.24', '1.0.23', '1.0.22', '1.0.21', '1.0.19', '1.0.18', '1.0.17', '1.0.16', '1.0.15', '1.0.14', '1.0.13', '1.0.12', '1.0.11', '1.0.10', '1.0.9', '1.0.6', '1.0.5', '1.0.4', '1.0.3', '1.0.2', '1.0.1', '1.0.0'),
+			),
+		);
+		
+		foreach ($ajaxlibs as $handle => $lib) {
+			$cdn_scripts[$handle] = $lib['src'];
 		}
 		
 		// send it back
