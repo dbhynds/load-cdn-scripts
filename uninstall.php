@@ -10,6 +10,7 @@ foreach($option_names as $option_name) {
 	// For site options in multisite
 	delete_site_option( $option_name );  
 }
+wp_clear_scheduled_hook('load_cdn_scripts');
 
 //drop a custom db table
 //global $wpdb;
