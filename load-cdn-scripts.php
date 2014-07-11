@@ -30,6 +30,7 @@ class load_cdn_scripts {
 			add_action('admin_menu', array(__CLASS__,'submenu_page'));
 			// add settings to db
 			add_action( 'admin_init', array(__CLASS__,'register_settings') );
+			add_action( 'admin_init', array(__CLASS__,'setup_cron') );
 		} else {
 			// override the scripts
 			add_action('get_header',array(__CLASS__,'override_scripts'));
@@ -48,6 +49,21 @@ class load_cdn_scripts {
 		add_option('registered_scripts',array());
 		// save an empty set of override scripts
 		add_option('override_scripts',array());
+	}
+	static function setup_cron() {
+		if ( ! wp_next_scheduled( self::$ID ) ) wp_schedule_event( time(),'hourly',self::$ID );
+		add_action(self::$ID, array(__CLASS__,'check_cdns') );
+	}
+	static function check_cdns($check_scripts = false) {
+		if ($check_scripts === false) $check_scripts = get_option('override_scripts');
+		if ($check_scripts) {
+			foreach($check_scripts as $key => $script) {
+				$fileexists = file_get_contents("http:".$script['src'],0,null,0,1);
+				$check_scripts[$key]['status'] = $fileexists;
+			}
+			update_option('override_scripts',$check_scripts);
+		}
+
 	}
 	
 	static function update_options() {
@@ -70,7 +86,13 @@ class load_cdn_scripts {
 					$handle = substr($key,4);
 					$cdn_url = ($handle == 'jquery-core') ? $_POST['src_jquery-core'] : $_POST['src_'.$handle];
 					$registered_scripts[$handle] = array ( 'src' => $val, 'cdn_url' => $cdn_url);
-					if ($val == 'cdn') $override_scripts[$handle] = $_POST['src_'.$handle];
+					if ($val == 'cdn') {
+						$is_up = false;
+						$override_scripts[$handle] = array(
+							'src' =>$_POST['src_'.$handle],
+							'status' => $is_up,
+						);
+					}
 				}
 			}
 			//var_dump($override_scripts);
@@ -85,6 +107,8 @@ class load_cdn_scripts {
         <?php if (!current_user_can('manage_options')) wp_die('You do not have sufficient permissions to access this page.');
 			self::update_options();
 			global $wp_scripts;
+			
+			self::check_cdns();
 		?>
 		<div class="wrap">
 			<h2>Registered</h2>
@@ -253,6 +277,7 @@ class load_cdn_scripts {
 	}
 	
 	static function override_scripts() {
+		
 		global $wp_scripts;
 		//var_dump($wp_scripts);
 		
@@ -260,7 +285,7 @@ class load_cdn_scripts {
 		$override_scripts = get_option('override_scripts');
 		// loop through and replace any scripts with CDN sources
 		foreach ($override_scripts as $handle => $script) {
-			if(array_key_exists($handle,$wp_scripts->registered)) $wp_scripts->registered[$handle]->src = $script;
+			if(array_key_exists($handle,$wp_scripts->registered) && $script['status'] !== false) $wp_scripts->registered[$handle]->src = $script['src'];
 		}
 	}
 	
