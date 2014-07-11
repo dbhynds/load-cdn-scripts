@@ -65,7 +65,6 @@ class load_cdn_scripts {
 			/* fill $override_scripts as [handle] => new_src
 			*/
 			//var_dump($_POST);
-			echo "<br /><br />";
 			foreach ( $_POST as $key => $val ) {
 				if (substr($key,0,4) == 'opt_') {
 					$handle = substr($key,4);
@@ -101,8 +100,31 @@ class load_cdn_scripts {
 				}
 				#registered-scripts table td {
 				}
+				#registered-scripts input[type="text"],
+				#registered-scripts button {
+					margin: 0;
+				}
 				#registered-scripts input[type="text"] {
 					width: 100%;
+					margin: 0;
+				}
+				#registered-scripts input.cdn_src {
+					width: 90%;
+					float:left;
+				}
+				#registered-scripts a.btn {
+					float:left;
+					height: 27px;
+					font: 400 20px/1 dashicons;
+					width: 27px;
+					padding: 0;
+					display: block;
+					text-align: center;
+				}
+				#registered-scripts a.btn:before {
+					content: '\f463';
+					line-height: 27px;
+					color: rgb(153,153,153);
 				}
 			</style>
             <form method="post" action="">                
@@ -197,16 +219,16 @@ class load_cdn_scripts {
 		// echo default script info as registered with wordpress
 		$return .= '<td>';
 			// echo default src
-			$return .= '<input type="text" disabled="disabled" value="'.$scripts->src.'" />';
+			$return .= '<input type="text" class="default-src" disabled="disabled" value="'.$scripts->src.'" />';
 			// echo version
 			$return .= '<small>Version: '.$scripts->ver.'</small></p>';
 			// if it should default to the custom src, check that and echo option
 		
 		$return .= '</td><td>';
-		
 			// WP calls jquery by the handle jquery-core
 			// if it should default to the registered src, check that and echo option
-			$return .= '<input type="text" name="src_'.$handle.'" value="'.$src.'" />';
+			$return .= '<input type="text" class="cdn_src" name="src_'.$handle.'" value="'.$src.'" />';
+			$return .= '<a tilte="Reset to most recent CDN source" class="btn ab-icon reset_'.$handle.'" ></a>';
 			
 			// echo likely CDN version currently in use
 			preg_match('/\d+(\.\d+)+/', $src, $matches);
@@ -221,7 +243,7 @@ class load_cdn_scripts {
 			
 		$return .= '</td>';
 		// echo any deps
-		$return .= '<td class="">';
+		$return .= '<td>';
 		if ($scripts->deps) foreach($scripts->deps as $val) $return .= "$val<br>";
 		$return .= '</td>';
 		$return .= '</tr>';
@@ -233,7 +255,10 @@ class load_cdn_scripts {
 	static function override_scripts() {
 		global $wp_scripts;
 		//var_dump($wp_scripts);
+		
+		// get scripts to override
 		$override_scripts = get_option('override_scripts');
+		// loop through and replace any scripts with CDN sources
 		foreach ($override_scripts as $handle => $script) {
 			if(array_key_exists($handle,$wp_scripts->registered)) $wp_scripts->registered[$handle]->src = $script;
 		}
@@ -242,17 +267,6 @@ class load_cdn_scripts {
 	static function check_override() {
 		global $wp_scripts;
 		var_dump($wp_scripts);
-	}
-	
-	static function overwrite_srcs() {
-		global $wp_scripts;
-		foreach($wp_scripts->registered as $key => $val) {
-			if (self::$cdn_scripts[$key]) {
-				$val->src = self::$cdn_scripts[$key];
-				$val->ver = null;
-				// wp_register_script($val);
-			}
-		}
 	}
 	
 	static function get_cdn() {
