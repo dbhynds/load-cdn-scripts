@@ -1,0 +1,37 @@
+.samever {
+	background: #afa;
+}
+.nocdn {
+	background: #fcc;
+}
+.iscdn {
+	background: #acf;
+}
+#registered-scripts table td {
+}
+#registered-scripts input[type="text"],
+#registered-scripts button {
+	margin: 0;
+}
+#registered-scripts input[type="text"] {
+	width: 100%;
+	margin: 0;
+}
+#registered-scripts input.cdn_src {
+	width: 90%;
+	float:left;
+}
+#registered-scripts a.btn {
+	float:left;
+	height: 27px;
+	font: 400 20px/1 dashicons;
+	width: 27px;
+	padding: 0;
+	display: block;
+	text-align: center;
+}
+#registered-scripts a.btn:before {
+	content: '\f463';
+	line-height: 27px;
+	color: rgb(153,153,153);
+}

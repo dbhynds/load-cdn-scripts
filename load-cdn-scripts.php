@@ -31,6 +31,7 @@ class load_cdn_scripts {
 			// add settings to db
 			add_action( 'admin_init', array(__CLASS__,'register_settings') );
 			add_action( 'admin_init', array(__CLASS__,'setup_cron') );
+			wp_register_style(self::$ID,plugins_url('load_cdn_style.css',__FILE__));
 		} else {
 			// override the scripts
 			add_action('get_header',array(__CLASS__,'override_scripts'));
@@ -67,90 +68,47 @@ class load_cdn_scripts {
 	}
 	
 	static function update_options() {
-		// submitted by self?
-		if (isset($_POST["_wp_http_referer"]) && $_POST["_wp_http_referer"] == $_SERVER[REQUEST_URI]) {
-			// these will be our options
-			$registered_scripts = array();
-			$override_scripts = array();
-			/* fill $registered_scripts from $_POST as
-				[handle] => array (
-					'src' => $opt_val,
-					'custom' => $custom_val
-				)
-			*/
-			/* fill $override_scripts as [handle] => new_src
-			*/
-			//var_dump($_POST);
-			foreach ( $_POST as $key => $val ) {
-				if (substr($key,0,4) == 'opt_') {
-					$handle = substr($key,4);
-					$cdn_url = ($handle == 'jquery-core') ? $_POST['src_jquery-core'] : $_POST['src_'.$handle];
-					$registered_scripts[$handle] = array ( 'src' => $val, 'cdn_url' => $cdn_url);
-					if ($val == 'cdn') {
-						$is_up = false;
-						$override_scripts[$handle] = array(
-							'src' =>$_POST['src_'.$handle],
-							'status' => $is_up,
-						);
-					}
+		// these will be our options
+		$registered_scripts = array();
+		$override_scripts = array();
+		/* fill $registered_scripts from $_POST as
+			[handle] => array (
+				'src' => $opt_val,
+				'custom' => $custom_val
+			)
+		*/
+		/* fill $override_scripts as [handle] => new_src
+		*/
+		//var_dump($_POST);
+		foreach ( $_POST as $key => $val ) {
+			if (substr($key,0,4) == 'opt_') {
+				$handle = substr($key,4);
+				$cdn_url = ($handle == 'jquery-core') ? $_POST['src_jquery-core'] : $_POST['src_'.$handle];
+				$registered_scripts[$handle] = array ( 'src' => $val, 'cdn_url' => $cdn_url);
+				if ($val == 'cdn') {
+					$is_up = false;
+					$override_scripts[$handle] = array(
+						'src' =>$_POST['src_'.$handle],
+						'status' => $is_up,
+					);
 				}
 			}
-			//var_dump($override_scripts);
-			// update options in db
-			update_option('registered_scripts',$registered_scripts);
-			update_option('override_scripts',$override_scripts);
 		}
+		//var_dump($override_scripts);
+		// update options in db
+		update_option('registered_scripts',$registered_scripts);
+		update_option('override_scripts',$override_scripts);
 	}
 	
 	static function options_page() { ?>
 		<h2>Load CDN Scripts</h2>
         <?php if (!current_user_can('manage_options')) wp_die('You do not have sufficient permissions to access this page.');
-			self::update_options();
+			// submitted by self?
+			if (isset($_POST["_wp_http_referer"]) && $_POST["_wp_http_referer"] == $_SERVER[REQUEST_URI]) self::update_options();
 			global $wp_scripts;
-			
-			self::check_cdns();
 		?>
 		<div class="wrap">
 			<h2>Registered</h2>
-            <style>
-				.samever {
-					background: #afa;
-				}
-				.nocdn {
-					background: #fcc;
-				}
-				.iscdn {
-					background: #acf;
-				}
-				#registered-scripts table td {
-				}
-				#registered-scripts input[type="text"],
-				#registered-scripts button {
-					margin: 0;
-				}
-				#registered-scripts input[type="text"] {
-					width: 100%;
-					margin: 0;
-				}
-				#registered-scripts input.cdn_src {
-					width: 90%;
-					float:left;
-				}
-				#registered-scripts a.btn {
-					float:left;
-					height: 27px;
-					font: 400 20px/1 dashicons;
-					width: 27px;
-					padding: 0;
-					display: block;
-					text-align: center;
-				}
-				#registered-scripts a.btn:before {
-					content: '\f463';
-					line-height: 27px;
-					color: rgb(153,153,153);
-				}
-			</style>
             <form method="post" action="">                
                 <table class="widefat" id="registered-scripts">
                 <thead>
@@ -213,6 +171,7 @@ class load_cdn_scripts {
 	}
 	
 	static function list_scripts($pluginoptions = false, $scripts = array(),$class = null) {
+		wp_enqueue_style(self::$ID);
 		// set the handle
 		$handle = $scripts->handle;
 		// empty vars for options
@@ -378,22 +337,5 @@ class load_cdn_scripts {
 }
 // get us started
 add_action('init', array('load_cdn_scripts', 'init'));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ?>
