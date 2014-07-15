@@ -106,6 +106,7 @@ class load_cdn_scripts {
 			// submitted by self?
 			if (isset($_POST["_wp_http_referer"]) && $_POST["_wp_http_referer"] == $_SERVER[REQUEST_URI]) self::update_options();
 			global $wp_scripts;
+			wp_enqueue_style(self::$ID);
 		?>
 		<div class="wrap">
 			<h2>Registered</h2>
@@ -178,7 +179,6 @@ class load_cdn_scripts {
 	}
 	
 	static function list_scripts($pluginoptions = false, $scripts = array(),$class = null) {
-		wp_enqueue_style(self::$ID);
 		// set the handle
 		$handle = $scripts->handle;
 		// empty vars for options
@@ -211,7 +211,7 @@ class load_cdn_scripts {
 			// echo default src
 			$return .= '<input type="text" class="default-src" disabled="disabled" value="'.$scripts->src.'" />';
 			// echo md5 hash
-			$return .= '<small>md5 hash: '.md5_file(get_bloginfo('url').$scripts->src).'</small><br />';
+			//$return .= '<small>md5 hash: '.md5_file(get_bloginfo('url').$scripts->src).'</small><br />';
 			// echo version
 			$return .= '<small>Version: '.$scripts->ver.'</small>';
 			// if it should default to the custom src, check that and echo option
@@ -223,7 +223,7 @@ class load_cdn_scripts {
 			$return .= '<a tilte="Reset to most recent CDN source" class="btn ab-icon reset_'.$handle.'" ></a>';
 			
 			// echo md5 hash
-			$return .= '<small>md5 hash: '.md5_file('http:'.$src).'</small><br />';
+			//$return .= '<small>md5 hash: '.md5_file('http:'.$src).'</small><br />';
 			// echo likely CDN version currently in use
 			preg_match('/\d+(\.\d+)+/', $src, $matches);
 			if (!$matches[0]) $matches[0] = 'unknown';
@@ -266,7 +266,11 @@ class load_cdn_scripts {
 	
 	static function get_cdn() {
 		
-		// get cdnjs page
+		ini_set('memory_limit', '512M');
+		// get libraries on cdnjs
+		$cdnjslibs = json_decode(file_get_contents("http://cdnjs.com/packages.json"))->packages;
+		
+		/*// get cdnjs page
 		$xml = file_get_contents("http://cdnjs.com/");
 		// get the table from that page
 		$haystack = substr($xml,strpos($xml,'<table'),strpos($xml,'</table>')-strpos($xml,'<table')+9);
@@ -290,6 +294,16 @@ class load_cdn_scripts {
 			$val = substr($haystack,$keyPos,strpos($haystack,'</p>',$keyPos)-$keyPos);
 			// add [handle] => src to array
 			$cdn_scripts[$key] = $val;
+		}*/
+		
+		foreach($cdnjslibs as $cdnjslib) {
+			$name = strtolower($cdnjslib->name);
+			$versions = array();
+			foreach ( $cdnjslib->assets as $asset ) $versions[] .= $asset->version;
+			$cdn_scripts[$name] = array(
+				'src' => '//cdnjs.cloudflare.com/ajax/libs/'.$name.'/'.$cdnjslib->version.'/'.$cdnjslib->filename ,
+				'versions' => $versions,
+			);
 		}
 		
 		// handles and srcs for Google Ajax Libs
@@ -338,7 +352,7 @@ class load_cdn_scripts {
 		);
 		
 		foreach ($ajaxlibs as $handle => $lib) {
-			$cdn_scripts[$handle] = $lib['src'];
+			$cdn_scripts[$handle] = $lib;
 		}
 		
 		// send it back
