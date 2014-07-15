@@ -149,12 +149,19 @@ class load_cdn_scripts {
 					if ($scripts->src) {
 						// search for a likely version number in the [src] of the matching CDN script
 						preg_match('/\d+(\.\d+)+/', self::$cdn_scripts[$scripts->handle], $matches);
+						
 						// no css class yet
 						$css = null;
-						// if the registered version matches the probably CDN version, note this and flag it for possible CDN-ifying
-						if (strpos($scripts->ver,$matches[0]) === 0 || strpos($matches[0],$scripts->ver) === 0) $css = 'samever';
-						// if there isn't a CDN match, flag for warning
-						if (preg_match('/^\/\//',$scripts->src)) $css = 'iscdn';
+						if (preg_match('/^\/\//',$scripts->src)) :
+							$css = 'iscdn';
+						else :
+							// get md5 hash for the CDN script
+							$cdn_md5 = md5_file('http:'.self::$cdn_scripts[$scripts->handle]);
+							// get md5 hash of default script
+							$default_md5 = md5_file(get_bloginfo('url').$scripts->src);
+							// if the md5 hasheds match, flag for cdnifying
+							if ($cdn_md5 == $default_md5) $css = 'samever';
+						endif;
 						//echo the options
 						echo self::list_scripts($pluginoptions, $scripts, $css);
 					}
@@ -203,8 +210,10 @@ class load_cdn_scripts {
 		$return .= '<td>';
 			// echo default src
 			$return .= '<input type="text" class="default-src" disabled="disabled" value="'.$scripts->src.'" />';
+			// echo md5 hash
+			$return .= '<small>md5 hash: '.md5_file(get_bloginfo('url').$scripts->src).'</small><br />';
 			// echo version
-			$return .= '<small>Version: '.$scripts->ver.'</small></p>';
+			$return .= '<small>Version: '.$scripts->ver.'</small>';
 			// if it should default to the custom src, check that and echo option
 		
 		$return .= '</td><td>';
@@ -213,6 +222,8 @@ class load_cdn_scripts {
 			$return .= '<input type="text" class="cdn_src" name="src_'.$handle.'" value="'.$src.'" />';
 			$return .= '<a tilte="Reset to most recent CDN source" class="btn ab-icon reset_'.$handle.'" ></a>';
 			
+			// echo md5 hash
+			$return .= '<small>md5 hash: '.md5_file('http:'.$src).'</small><br />';
 			// echo likely CDN version currently in use
 			preg_match('/\d+(\.\d+)+/', $src, $matches);
 			if (!$matches[0]) $matches[0] = 'unknown';
