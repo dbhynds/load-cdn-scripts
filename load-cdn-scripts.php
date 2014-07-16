@@ -196,7 +196,7 @@ class load_cdn_scripts {
 			if ($class == 'samever') $opt = 'cdn';
 			$tmphandle = ($handle == 'jquery-core') ? 'jquery' : $handle;
 			$cdnurl = self::$cdn_urls[self::$cdn_scripts[$tmphandle]['cdn']];
-			$src = $cdnurl . $tmphandle . '/' . $cdn_version . '/' . self::$cdn_scripts[$tmphandle]['filename'];
+			$src = (empty($vers)) ? $src = self::$cdn_scripts[$tmphandle]['src'] : $cdnurl . $tmphandle . '/' . $cdn_version . '/' . self::$cdn_scripts[$tmphandle]['filename'];
 		}
 		
 		// start fresh
@@ -224,12 +224,14 @@ class load_cdn_scripts {
 			// if it should default to the custom src, check that and echo option
 		
 		$return .= '</td><td>';
-			$return .= '<select>';
-			foreach ( $vers as $ver ) {
-				$selected = ($ver == $cdn_version) ? 'selected' : '';
-				$return .= "<option $selected>$ver</option>";
+			if (!empty($vers)) {
+				$return .= '<select>';
+				foreach ( $vers as $ver ) {
+					$selected = ($ver == $cdn_version) ? 'selected' : '';
+					$return .= "<option $selected>$ver</option>";
+				}
+				$return .= '</select>';
 			}
-			$return .= '</select>';
 		
 		$return .= '</td><td>';
 			// WP calls jquery by the handle jquery-core
