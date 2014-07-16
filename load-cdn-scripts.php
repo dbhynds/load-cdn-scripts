@@ -17,6 +17,10 @@ class load_cdn_scripts {
 	
 	// plugin ID
 	static $ID = 'load_cdn_scripts';
+	static $cdn_urls = array(
+		'cdnjs' => '//cdnjs.cloudflare.com/ajax/libs/',
+		'google' => '//ajax.googleapis.com/ajax/libs/',
+	);
 	
 	// list of all CDN scripts hosted on cdnjs
 	static $cdn_scripts;
@@ -25,7 +29,7 @@ class load_cdn_scripts {
 	static function init() {
 		if (is_admin()) {
 			// Load up $cdn_scripts with list from cdnjs
-			self::$cdn_scripts = self::get_cdn();
+			self::$cdn_scripts = (get_option('cdn_scripts')) ? get_option('cdn_scripts') : self::get_cdn();
 			// add submenu item for plugin options page
 			add_action('admin_menu', array(__CLASS__,'submenu_page'));
 			// add settings to db
@@ -116,7 +120,8 @@ class load_cdn_scripts {
                     <th>Handle</th>
                     <th>Load from</th>
                     <th>Default</th>
-                    <th>CDN</th>
+                    <th>CDN Version</th>
+                    <th>Source</th>
                     <th>Dependencies</th>
                 </thead>
                 <tbody>
@@ -147,10 +152,7 @@ class load_cdn_scripts {
                 foreach($registeredscripts as $val) {
 					// get the script's info from the list of registered scripts
 					$scripts = $wp_scripts->registered[$val];
-					if ($scripts->src) {
-						// search for a likely version number in the [src] of the matching CDN script
-						preg_match('/\d+(\.\d+)+/', self::$cdn_scripts[$scripts->handle], $matches);
-						
+					if ($scripts->src) {	
 						// no css class yet
 						$css = null;
 						if (preg_match('/^\/\//',$scripts->src)) :
@@ -183,13 +185,18 @@ class load_cdn_scripts {
 		$handle = $scripts->handle;
 		// empty vars for options
 		$opt = 'native';
-		$src;
+		// load cdn vers
+		$vers = ($handle == 'jquery-core') ? self::$cdn_scripts['jquery']['versions'] : self::$cdn_scripts[$handle]['versions'];
+		$cdn_version = (in_array($scripts->ver,$vers)) ? $scripts->ver : $vers[0];
+		// set cdn $src;
 		if ($pluginoptions) {
 			$opt = $pluginoptions[$handle]['src'];
 			$src = $pluginoptions[$handle]['cdn_url'];
 		} else {
 			if ($class == 'samever') $opt = 'cdn';
-			$src = ($handle == 'jquery-core') ? self::$cdn_scripts['jquery'] : self::$cdn_scripts[$handle];
+			$tmphandle = ($handle == 'jquery-core') ? 'jquery' : $handle;
+			$cdnurl = self::$cdn_urls[self::$cdn_scripts[$tmphandle]['cdn']];
+			$src = $cdnurl . $tmphandle . '/' . $cdn_version . '/' . self::$cdn_scripts[$tmphandle]['filename'];
 		}
 		
 		// start fresh
@@ -211,10 +218,18 @@ class load_cdn_scripts {
 			// echo default src
 			$return .= '<input type="text" class="default-src" disabled="disabled" value="'.$scripts->src.'" />';
 			// echo md5 hash
-			//$return .= '<small>md5 hash: '.md5_file(get_bloginfo('url').$scripts->src).'</small><br />';
+			$return .= '<small>md5 hash: '.md5_file(get_bloginfo('url').$scripts->src).'</small><br />';
 			// echo version
 			$return .= '<small>Version: '.$scripts->ver.'</small>';
 			// if it should default to the custom src, check that and echo option
+		
+		$return .= '</td><td>';
+			$return .= '<select>';
+			foreach ( $vers as $ver ) {
+				$selected = ($ver == $cdn_version) ? 'selected' : '';
+				$return .= "<option $selected>$ver</option>";
+			}
+			$return .= '</select>';
 		
 		$return .= '</td><td>';
 			// WP calls jquery by the handle jquery-core
@@ -223,20 +238,18 @@ class load_cdn_scripts {
 			$return .= '<a tilte="Reset to most recent CDN source" class="btn ab-icon reset_'.$handle.'" ></a>';
 			
 			// echo md5 hash
-			//$return .= '<small>md5 hash: '.md5_file('http:'.$src).'</small><br />';
+			$return .= '<small>md5 hash: '.md5_file('http:'.$src).'</small><br />';
 			// echo likely CDN version currently in use
 			preg_match('/\d+(\.\d+)+/', $src, $matches);
 			if (!$matches[0]) $matches[0] = 'unknown';
-			$return .= '<small>Version: '.$matches[0].'</small>';
-			
-			// echo likely latest CDN version
+			$return .= '<small>Version: '.$cdn_version.'</small>';
+			/*// echo likely latest CDN version
 			$temphandle = ($handle == 'jquery-core') ? 'jquery' : $handle;
 			preg_match('/\d+(\.\d+)+/', self::$cdn_scripts[$temphandle], $latest_matches);
 			//$return .= ' '.$matches[0].' '.$latest_matches[0];
-			if ($latest_matches[0] !== $matches[0] && $matches[0] !=='unknown') $return .= ' - <small>Latest CDN Version: '.$latest_matches[0].'</small>';
-			
-		$return .= '</td>';
+			if ($latest_matches[0] !== $matches[0] && $matches[0] !=='unknown') $return .= ' - <small>Latest CDN Version: '.$latest_matches[0].'</small>';*/
 		// echo any deps
+		$return .= '</td>';
 		$return .= '<td>';
 		if ($scripts->deps) foreach($scripts->deps as $val) $return .= "$val<br>";
 		$return .= '</td>';
@@ -303,6 +316,8 @@ class load_cdn_scripts {
 			$cdn_scripts[$name] = array(
 				'src' => '//cdnjs.cloudflare.com/ajax/libs/'.$name.'/'.$cdnjslib->version.'/'.$cdnjslib->filename ,
 				'versions' => $versions,
+				'cdn' => 'cdnjs',
+				'filename' => $cdnjslib->filename,
 			);
 		}
 		
@@ -311,47 +326,58 @@ class load_cdn_scripts {
 			'angularjs' => array(
 				'src' => '//ajax.googleapis.com/ajax/libs/angularjs/1.2.19/angular.min.js',
 				'versions' => array('1.2.19', '1.2.18', '1.2.17', '1.2.16', '1.2.15', '1.2.14', '1.2.13', '1.2.12', '1.2.11', '1.2.10', '1.2.9', '1.2.8', '1.2.7', '1.2.6', '1.2.5', '1.2.4', '1.2.3', '1.2.2', '1.2.1', '1.2.0', '1.0.8', '1.0.7', '1.0.6', '1.0.5', '1.0.4', '1.0.3', '1.0.2', '1.0.1'),
+				'filename' => 'angular.min.js',
 			),
 			'dojo' => array(
 				'src' => '//ajax.googleapis.com/ajax/libs/dojo/1.10.0/dojo/dojo.js',
 				'versions' => array('1.10.0', '1.9.3', '1.9.2', '1.9.1', '1.9.0', '1.8.6', '1.8.5', '1.8.4', '1.8.3', '1.8.2', '1.8.1', '1.8.0', '1.7.5', '1.7.4', '1.7.3', '1.7.2', '1.7.1', '1.7.0', '1.6.2', '1.6.1', '1.6.0', '1.5.3', '1.5.2', '1.5.1', '1.5.0', '1.4.5', '1.4.4', '1.4.3', '1.4.1', '1.4.0', '1.3.2', '1.3.1', '1.3.0', '1.2.3', '1.2.0', '1.1.1'),
+				'filename' => 'dojo/dojo.js',
 			),
 			'ext-core' => array(
 				'src' => '//ajax.googleapis.com/ajax/libs/ext-core/3.1.0/ext-core.js',
 				'versions' => array('3.1.0', '3.0.0'),
+				'filename' => 'ext-core.js',
 			),
 			'jquery' => array(
 				'src' => '//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js',
 				'versions' => array('2.1.1', '2.1.0', '2.0.3', '2.0.2', '2.0.1', '2.0.0', '1.11.1', '1.11.0', '1.10.2', '1.10.1', '1.10.0', '1.9.1', '1.9.0', '1.8.3', '1.8.2', '1.8.1', '1.8.0', '1.7.2', '1.7.1', '1.7.0', '1.6.4', '1.6.3', '1.6.2', '1.6.1', '1.6.0', '1.5.2', '1.5.1', '1.5.0', '1.4.4', '1.4.3', '1.4.2', '1.4.1', '1.4.0', '1.3.2', '1.3.1', '1.3.0', '1.2.6', '1.2.3'),
+				'filename' => 'jquery.min.js',
 			),
 			'jquery-mobile' => array(
 				'src' => '//ajax.googleapis.com/ajax/libs/jquerymobile/1.4.3/jquery.mobile.min.js',
 				'style' => '//ajax.googleapis.com/ajax/libs/jquerymobile/1.4.3/jquery.mobile.min.css',
 				'versions' => array('1.4.3', '1.4.2', '1.4.1', '1.4.0'),
+				'filename' => 'jquery.mobile.min.js',
 			),
 			'mootools' => array(
 				'src' => '//ajax.googleapis.com/ajax/libs/mootools/1.5.0/mootools-yui-compressed.js',
 				'versions' => array('1.5.0', '1.4.5', '1.4.4', '1.4.3', '1.4.2', '1.4.1', '1.4.0', '1.3.2', '1.3.1', '1.3.0', '1.2.5', '1.2.4', '1.2.3', '1.2.2', '1.2.1', '1.1.2', '1.1.1'),
+				'filename' => 'mootools-yui-compressed.js',
 			),
 			'prototype' => array(
 				'src' => '//ajax.googleapis.com/ajax/libs/prototype/1.7.2.0/prototype.js',
 				'versions' => array('1.7.2.0', '1.7.1.0', '1.7.0.0', '1.6.1.0', '1.6.0.3', '1.6.0.2'),
+				'filename' => 'prototype.js',
 			),
 			'scriptaculous' => array(
 				'src' => '//ajax.googleapis.com/ajax/libs/scriptaculous/1.9.0/scriptaculous.js',
 				'versions' => array('1.9.0', '1.8.3', '1.8.2', '1.8.1'),
+				'filename' => 'scriptaculous.js',
 			),
 			'swfobject' => array(
 				'src' => '//ajax.googleapis.com/ajax/libs/swfobject/2.2/swfobject.js',
 				'versions' => array('2.2', '2.1'),
+				'filename' => 'swfobject.js',
 			),
 			'webfont' => array(
 				'src' => '//ajax.googleapis.com/ajax/libs/webfont/1.5.3/webfont.js',
 				'versions' => array('1.5.3', '1.5.2', '1.5.0', '1.4.10', '1.4.8', '1.4.7', '1.4.6', '1.4.2', '1.3.0', '1.1.2', '1.1.1', '1.1.0', '1.0.31', '1.0.30', '1.0.29', '1.0.28', '1.0.27', '1.0.26', '1.0.25', '1.0.24', '1.0.23', '1.0.22', '1.0.21', '1.0.19', '1.0.18', '1.0.17', '1.0.16', '1.0.15', '1.0.14', '1.0.13', '1.0.12', '1.0.11', '1.0.10', '1.0.9', '1.0.6', '1.0.5', '1.0.4', '1.0.3', '1.0.2', '1.0.1', '1.0.0'),
+				'filename' => 'webfont.js',
 			),
 		);
 		
 		foreach ($ajaxlibs as $handle => $lib) {
+			$lib['cdn'] = 'google';
 			$cdn_scripts[$handle] = $lib;
 		}
 		
